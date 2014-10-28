@@ -35,6 +35,7 @@ import org.eclipse.swtbot.swt.finder.widgets.SWTBotButton;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotCheckBox;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotMenu;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
+import org.eclipse.swtbot.swt.finder.widgets.SWTBotText;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTree;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTreeItem;
 import org.eclipse.tracecompass.tmf.ui.editors.TmfEventsEditor;
@@ -46,6 +47,7 @@ import org.eclipse.tracecompass.tmf.ui.views.TracingPerspectiveFactory;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IEditorReference;
 import org.eclipse.ui.IPageLayout;
+import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.WorkbenchException;
 import org.hamcrest.Matcher;
@@ -103,6 +105,46 @@ public abstract class SWTBotUtil {
     }
 
     /**
+     * Create a tracing project using the UI
+     *
+     * @param projectName
+     *            the name of the tracing project
+     * @param bot
+     *            the workbench bot
+     */
+    public static void createProjectFromUI(final String projectName, SWTWorkbenchBot bot) {
+        SWTBotUtil.focusMainWindow(bot.shells());
+        bot.menu("File").menu("New").menu("Project...").click();
+
+        bot.shell("New Project").setFocus();
+        SWTBotTree tree = bot.tree();
+        assertNotNull(tree);
+        final String tracingKey = "Tracing";
+        bot.waitUntil(ConditionHelpers.IsTreeNodeAvailable(tracingKey, tree));
+        final SWTBotTreeItem tracingNode = tree.expandNode(tracingKey);
+
+        tracingNode.select();
+        final String projectKey = "Tracing Project";
+        bot.waitUntil(ConditionHelpers.IsTreeChildNodeAvailable(projectKey, tracingNode));
+        final SWTBotTreeItem tracingProject = tracingNode.getNode(projectKey);
+        assertNotNull(tracingProject);
+
+        tracingProject.select();
+        tracingProject.click();
+
+        SWTBotButton nextButton = bot.button("Next >");
+        bot.waitUntil(Conditions.widgetIsEnabled(nextButton));
+        nextButton.click();
+        bot.shell("Tracing Project").setFocus();
+
+        final SWTBotText text = bot.text();
+        text.setText(projectName);
+
+        bot.button("Finish").click();
+        SWTBotUtil.waitForJobs();
+    }
+
+    /**
      * Deletes a tracing project
      *
      * @param projectName
@@ -156,6 +198,27 @@ public abstract class SWTBotUtil {
     }
 
     /**
+     * Open a view with an id
+     *
+     * @param viewId
+     *            the view id, like "org.eclipse.linuxtools.lttng2.kernel.ui.views.resources"
+     * @param bot
+     *            the workbench bot
+     */
+    public static void openViewById(final String viewId, SWTWorkbenchBot bot) {
+        UIThreadRunnable.syncExec(new VoidResult() {
+            @Override
+            public void run() {
+                try {
+                    PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView(viewId);
+                } catch (PartInitException e) {
+                    fail(e.getMessage());
+                }
+            }
+        });
+    }
+
+    /**
      * Close a view with a title
      *
      * @param title
@@ -171,6 +234,20 @@ public abstract class SWTBotUtil {
                 bot.waitUntil(ConditionHelpers.ViewIsClosed(view));
             }
         }
+    }
+
+    /**
+     * Close a view with an id
+     *
+     * @param viewId
+     *            the view id, like "org.eclipse.linuxtools.lttng2.kernel.ui.views.resources"
+     * @param bot
+     *            the workbench bot
+     */
+    public static void closeViewById(String viewId, SWTWorkbenchBot bot) {
+        final SWTBotView view = bot.viewById(viewId);
+        view.close();
+        bot.waitUntil(ConditionHelpers.ViewIsClosed(view));
     }
 
     /**
